@@ -55,19 +55,42 @@ let questionBank=[];
 try{
 
 
-    questionBank =
+    let jsonData = JSON.parse(
 
-    JSON.parse(
+    fs.readFileSync(
 
-        fs.readFileSync(
+        "./questions.json",
 
-            "./questions.json",
+        "utf8"
 
-            "utf8"
+    )
 
-        )
+);
 
+
+if(Array.isArray(jsonData)){
+
+
+    questionBank=jsonData;
+
+
+}
+else if(jsonData.questions){
+
+
+    questionBank=jsonData.questions;
+
+
+}
+else{
+
+
+    throw new Error(
+        "questions.json格式错误"
     );
+
+
+}
 
 
 
