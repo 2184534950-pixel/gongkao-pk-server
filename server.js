@@ -1014,13 +1014,134 @@ if(data.type==="submit"){
 
 
 
+    console.log(
+
+        "玩家完成:",
+
+        player.id,
+
+        player.score
+
+    );
 
 
-    room.players.forEach(p=>{
 
 
 
-        if(p.socket.readyState===1){
+
+    // 检查双方是否都完成
+
+
+    let allFinish =
+
+    room.players.every(p=>p.finished);
+
+
+
+
+
+
+
+
+    if(allFinish){
+
+
+
+        let p1=room.players[0];
+
+        let p2=room.players[1];
+
+
+
+
+
+
+
+        let result="";
+
+
+
+        if(p1.score>p2.score){
+
+
+            result="player1";
+
+
+        }
+
+        else if(p2.score>p1.score){
+
+
+            result="player2";
+
+
+        }
+
+        else{
+
+
+            result="draw";
+
+
+        }
+
+
+
+
+
+
+
+        console.log(
+
+            "比赛结果:",
+
+            result
+
+        );
+
+
+
+
+
+
+
+
+
+        room.players.forEach(p=>{
+
+
+
+            let win=false;
+
+
+            if(
+
+                result==="draw"
+
+            ){
+
+
+                win=false;
+
+
+            }
+
+            else if(
+
+                result==="player"+p.id
+
+            ){
+
+
+                win=true;
+
+
+            }
+
+
+
+
+
 
 
 
@@ -1028,11 +1149,30 @@ if(data.type==="submit"){
 
 
 
-                type:"finish",
+                type:"gameResult",
 
 
 
-                player:player.id
+                result:result,
+
+
+
+                myScore:p.score,
+
+
+
+                enemyScore:
+
+
+                room.players.find(
+
+                    x=>x!==p
+
+                ).score,
+
+
+
+                win:win
 
 
 
@@ -1040,11 +1180,33 @@ if(data.type==="submit"){
 
 
 
-        }
+        });
 
 
-    });
 
+
+
+    }
+
+    else{
+
+
+
+        socket.send(JSON.stringify({
+
+
+            type:"finish",
+
+
+            player:player.id
+
+
+
+        }));
+
+
+
+    }
 
 
 
@@ -1055,30 +1217,6 @@ if(data.type==="submit"){
 
 
 }
-
-
-
-
-
-
-
-
-
-
-
-
-});
-
-
-
-
-
-
-
-
-
-
-
 
 // ===============================
 // 玩家离开
