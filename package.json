@@ -1,6 +1,7 @@
 {
-  "name": "gongkaopk-server",
+  "name": "gongkao-pk-server",
   "version": "1.0.0",
+  "description": "公务员行测竞技擂台联机服务器",
   "main": "server.js",
   "scripts": {
     "start": "node server.js"
