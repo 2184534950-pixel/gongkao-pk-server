@@ -44,7 +44,7 @@ console.log(
 
 
 // ===============================
-// 加载题库
+// 加载题库（支持JSON注释）
 // ===============================
 
 
@@ -55,71 +55,140 @@ let questionBank=[];
 try{
 
 
-    let jsonData = JSON.parse(
 
-    fs.readFileSync(
+    let rawData = fs.readFileSync(
 
         "./questions.json",
 
         "utf8"
 
-    )
-
-);
-
-
-if(Array.isArray(jsonData)){
-
-
-    questionBank=jsonData;
-
-
-}
-else if(jsonData.questions){
-
-
-    questionBank=jsonData.questions;
-
-
-}
-else{
-
-
-    throw new Error(
-        "questions.json格式错误"
     );
 
 
-}
+
+
+
+    // 删除 // 单行注释
+
+    rawData = rawData.replace(
+
+        /\/\/.*$/gm,
+
+        ""
+
+    );
+
+
+
+
+
+    // 删除 /* */ 多行注释
+
+    rawData = rawData.replace(
+
+        /\/\*[\s\S]*?\*\//g,
+
+        ""
+
+    );
+
+
+
+
+
+
+
+
+    let jsonData = JSON.parse(
+
+        rawData
+
+    );
+
+
+
+
+
+
+
+    if(Array.isArray(jsonData)){
+
+
+
+        questionBank=jsonData;
+
+
+
+    }
+
+    else if(jsonData.questions){
+
+
+
+        questionBank=jsonData.questions;
+
+
+
+    }
+
+    else{
+
+
+
+        throw new Error(
+
+            "questions.json格式错误"
+
+        );
+
+
+
+    }
+
+
+
+
 
 
 
     console.log(
 
+
         "题库加载成功:",
+
 
         questionBank.length,
 
+
         "道"
 
+
     );
+
+
+
+
 
 
 
 }catch(e){
 
 
+
     console.log(
+
 
         "题库读取失败:",
 
+
         e.message
+
 
     );
 
 
-}
 
+}
 
 
 
