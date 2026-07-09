@@ -65,14 +65,11 @@ const questionBank = Object.entries(rawQuestionBank)
 
     return questions.map(q=>({
 
+    ...q,
 
-        ...q,
+    category:category
 
-
-        category:category
-
-
-    }));
+}));
 
 
 });
