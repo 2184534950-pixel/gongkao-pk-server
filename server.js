@@ -111,40 +111,63 @@ try{
 
 
 
-    if(Array.isArray(jsonData)){
+   if(Array.isArray(jsonData)){
+
+
+    questionBank=jsonData;
+
+
+}
+
+else if(jsonData.questions){
+
+
+    questionBank=jsonData.questions;
+
+
+}
+
+
+// 兼容分类对象结构
+
+else if(typeof jsonData==="object"){
 
 
 
-        questionBank=jsonData;
+    Object.keys(jsonData).forEach(key=>{
+
+
+        if(Array.isArray(jsonData[key])){
+
+
+            questionBank.push(
+
+                ...jsonData[key]
+
+            );
+
+
+        }
+
+
+    });
+
+
+}
 
 
 
-    }
-
-    else if(jsonData.questions){
+if(questionBank.length===0){
 
 
+    throw new Error(
 
-        questionBank=jsonData.questions;
+        "questions.json格式错误"
 
-
-
-    }
-
-    else{
+    );
 
 
-
-        throw new Error(
-
-            "questions.json格式错误"
-
-        );
-
-
-
-    }
-
+}
 
 
 
