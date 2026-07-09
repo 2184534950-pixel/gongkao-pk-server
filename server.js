@@ -1,5 +1,6 @@
 // ===============================
-// 公务员行测竞技擂台 联机服务器 V2
+// 公务员行测竞技擂台 联机服务器 V3
+// 服务器发题版本
 // ===============================
 
 
@@ -17,7 +18,7 @@ const PORT = process.env.PORT || 3000;
 
 const wss = new WebSocket.Server({
 
-    port:PORT
+    port: PORT
 
 });
 
@@ -25,7 +26,198 @@ const wss = new WebSocket.Server({
 
 console.log("服务器启动成功");
 
-console.log("监听端口:"+PORT);
+console.log("监听端口:" + PORT);
+
+
+
+
+
+
+// ===============================
+// 服务器题库
+// 后期可以扩展成json文件
+// ===============================
+
+
+const questionBank = [
+
+
+{
+    id:1,
+
+    category:"常识判断",
+
+    q:"我国最高国家权力机关是？",
+
+    options:[
+
+        "国务院",
+
+        "最高人民法院",
+
+        "全国人民代表大会",
+
+        "国家监察委员会"
+
+    ],
+
+    answer:2
+
+},
+
+
+
+{
+    id:2,
+
+    category:"数量关系",
+
+    q:"某数的3倍减8等于22，该数是多少？",
+
+    options:[
+
+        "8",
+
+        "10",
+
+        "12",
+
+        "14"
+
+    ],
+
+    answer:1
+
+},
+
+
+
+{
+    id:3,
+
+    category:"判断推理",
+
+    q:"从众效应是指个体受到群体影响改变观点，以下属于从众效应的是？",
+
+    options:[
+
+        "坚持自己的学习方法",
+
+        "大家报名公考班，小李也报名",
+
+        "独立思考解决问题",
+
+        "根据自身情况选择职业"
+
+    ],
+
+    answer:1
+
+},
+
+
+
+{
+    id:4,
+
+    category:"言语理解",
+
+    q:"传统文化传承不能____，要结合时代特色创新表达。",
+
+    options:[
+
+        "固步自封",
+
+        "邯郸学步",
+
+        "拾人牙慧",
+
+        "刚愎自用"
+
+    ],
+
+    answer:0
+
+},
+
+
+
+{
+    id:5,
+
+    category:"资料分析",
+
+    q:"若某企业去年收入100万元，今年增长20%，今年收入是多少？",
+
+    options:[
+
+        "110万元",
+
+        "120万元",
+
+        "130万元",
+
+        "150万元"
+
+    ],
+
+    answer:1
+
+}
+
+
+];
+
+
+
+
+
+// ===============================
+// 随机抽题
+// ===============================
+
+
+function createQuestions(count,category){
+
+
+
+    let list=[...questionBank];
+
+
+
+    // 如果选择分类
+
+    if(category){
+
+
+        let temp=list.filter(q=>q.category===category);
+
+
+        if(temp.length>0){
+
+            list=temp;
+
+        }
+
+    }
+
+
+
+    list.sort(()=>Math.random()-0.5);
+
+
+
+    return list.slice(
+
+        0,
+
+        Math.min(count,list.length)
+
+    );
+
+
+}
+
 
 
 
@@ -106,9 +298,6 @@ socket.send(JSON.stringify({
 
 
 
-
-
-
 socket.on("message",msg=>{
 
 
@@ -146,12 +335,9 @@ console.log(
 
 data.type,
 
-data.room||""
+data.room || ""
 
 );
-
-
-
 
 
 
@@ -202,7 +388,11 @@ rooms[roomId]={
 
 
 
-    count:data.count || 20
+    count:data.count || 20,
+
+
+
+    questions:[]
 
 
 
@@ -216,24 +406,6 @@ player.room=roomId;
 
 
 player.id=1;
-
-
-
-
-
-
-
-console.log(
-
-"创建房间:",
-
-roomId,
-
-rooms[roomId]
-
-);
-
-
 
 
 
@@ -279,15 +451,6 @@ return;
 
 
 }
-
-
-
-
-
-
-
-
-
 
 // ===============================
 // 加入房间
@@ -397,6 +560,38 @@ room.status="playing";
 
 
 
+// ===============================
+// 生成比赛题目
+// ===============================
+
+
+room.questions=createQuestions(
+
+    room.count,
+
+    room.category
+
+);
+
+
+
+
+
+
+console.log(
+
+"生成题目:",
+
+room.questions.length
+
+);
+
+
+
+
+
+
+
 
 console.log(
 
@@ -411,9 +606,7 @@ data.room
 
 
 
-
-
-// 告诉双方比赛信息
+// 通知双方开始
 
 
 room.players.forEach(p=>{
@@ -451,6 +644,7 @@ count:room.count
 }));
 
 
+
 }
 
 
@@ -462,8 +656,120 @@ count:room.count
 
 
 
+// 发送第一题
+
+
+setTimeout(()=>{
+
+
+room.players.forEach(p=>{
+
+
+    sendQuestion(p);
+
+
+});
+
+
+},500);
+
+
+
+
+
+
 
 return;
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+// ===============================
+// 发送题目函数
+// ===============================
+
+
+function sendQuestion(player){
+
+
+
+let room=rooms[player.room];
+
+
+
+if(!room)return;
+
+
+
+if(player.index>=room.questions.length){
+
+
+
+    player.socket.send(JSON.stringify({
+
+
+        type:"finishQuestion"
+
+
+    }));
+
+
+    return;
+
+}
+
+
+
+
+
+let q=room.questions[player.index];
+
+
+
+
+player.socket.send(JSON.stringify({
+
+
+    type:"question",
+
+
+    index:player.index,
+
+
+    total:room.questions.length,
+
+
+    question:{
+
+
+        id:q.id,
+
+
+        category:q.category,
+
+
+        q:q.q,
+
+
+        options:q.options
+
+
+    }
+
+
+
+}));
 
 
 
@@ -501,20 +807,26 @@ if(!room)return;
 
 
 
+let q=
 
-player.index++;
-
-
-
+room.questions[player.index];
 
 
 
-if(data.correct){
+
+
+let correct=
+
+data.choice===q.answer;
 
 
 
-player.score+=100;
 
+
+if(correct){
+
+
+    player.score+=100;
 
 
 }
@@ -524,18 +836,16 @@ player.score+=100;
 
 
 
-
-
 player.answers.push({
 
 
-
-choice:data.choice,
-
+    question:q.id,
 
 
-correct:data.correct
+    choice:data.choice,
 
+
+    correct:correct
 
 
 });
@@ -544,10 +854,45 @@ correct:data.correct
 
 
 
+player.index++;
 
 
 
-// 通知对手
+
+
+
+// 告诉自己结果
+
+
+socket.send(JSON.stringify({
+
+
+
+type:"result",
+
+
+
+score:player.score,
+
+
+
+correct:correct,
+
+
+
+index:player.index
+
+
+
+}));
+
+
+
+
+
+
+
+// 告诉对手进度
 
 
 room.players.forEach(p=>{
@@ -595,28 +940,18 @@ score:player.score
 
 
 
+// 下一题
 
 
-// 返回自己分数
+setTimeout(()=>{
 
 
-socket.send(JSON.stringify({
-
-
-
-type:"result",
+sendQuestion(player);
 
 
 
-score:player.score,
+},500);
 
-
-
-index:player.index
-
-
-
-}));
 
 
 
@@ -627,6 +962,8 @@ return;
 
 
 }
+
+
 
 
 
