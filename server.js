@@ -1,6 +1,6 @@
 // ===============================
-// 公务员行测竞技擂台 联机服务器 V5
-// questions.json版本
+// 公务员行测竞技擂台 V6
+// 稳定服务器版
 // ===============================
 
 
@@ -10,8 +10,9 @@ const fs = require("fs");
 
 
 
+
 // ===============================
-// 创建服务器
+// 服务器
 // ===============================
 
 
@@ -26,9 +27,17 @@ const wss = new WebSocket.Server({
 
 
 
-console.log("服务器启动成功");
+console.log(
+    "服务器启动成功"
+);
 
-console.log("监听端口:"+PORT);
+
+console.log(
+    "监听端口:",
+    PORT
+);
+
+
 
 
 
@@ -39,55 +48,56 @@ console.log("监听端口:"+PORT);
 // ===============================
 
 
-const rawQuestionBank = JSON.parse(
-
-
-    fs.readFileSync(
-
-        __dirname + "/questions.json",
-
-        "utf8"
-
-    )
-
-
-);
+let questionBank=[];
 
 
 
-
-// 转换分类JSON
-
-const questionBank = Object.entries(rawQuestionBank)
-
-.flatMap(([category,questions])=>{
+try{
 
 
-    return questions.map(q=>({
+    questionBank =
 
-    ...q,
+    JSON.parse(
 
-    category:category
+        fs.readFileSync(
 
-}));
+            "./questions.json",
 
+            "utf8"
 
-});
+        )
+
+    );
 
 
 
+    console.log(
+
+        "题库加载成功:",
+
+        questionBank.length,
+
+        "道"
+
+    );
 
 
 
-console.log(
+}catch(e){
 
-"题库加载成功:",
 
-questionBank.length,
+    console.log(
 
-"道"
+        "题库读取失败:",
 
-);
+        e.message
+
+    );
+
+
+}
+
+
 
 
 
@@ -96,7 +106,30 @@ questionBank.length,
 
 
 // ===============================
-// 抽题
+// 房间
+// ===============================
+
+
+let rooms={};
+
+
+
+
+
+// 玩家数据
+
+let players={};
+
+
+
+
+
+
+
+
+
+// ===============================
+// 随机抽题
 // ===============================
 
 
@@ -112,11 +145,11 @@ function createQuestions(count,category){
     if(category){
 
 
-        let temp=list.filter(q=>
+        let temp=
 
+        list.filter(q=>
 
             q.category===category
-
 
         );
 
@@ -124,9 +157,7 @@ function createQuestions(count,category){
 
         if(temp.length>0){
 
-
             list=temp;
-
 
         }
 
@@ -136,10 +167,7 @@ function createQuestions(count,category){
 
 
 
-
-
     list.sort(()=>Math.random()-0.5);
-
 
 
 
@@ -162,18 +190,528 @@ function createQuestions(count,category){
 
 }
 
-
-
-
-
-
-
 // ===============================
-// 房间数据
+// 玩家连接
 // ===============================
 
 
-let rooms={};
+wss.on("connection",socket=>{
+
+
+
+    console.log(
+
+        "玩家连接"
+
+    );
+
+
+
+
+
+    let player={
+
+
+        socket:socket,
+
+
+        room:null,
+
+
+        id:null,
+
+
+        score:0,
+
+
+        index:0,
+
+
+        finished:false,
+
+
+        answers:[]
+
+
+
+    };
+
+
+
+
+
+
+
+
+
+    socket.send(JSON.stringify({
+
+
+        type:"connected",
+
+
+        msg:"连接服务器成功"
+
+
+    }));
+
+
+
+
+
+
+
+
+
+    socket.on("message",msg=>{
+
+
+
+        let data;
+
+
+
+        try{
+
+
+            data=
+
+            JSON.parse(msg);
+
+
+
+        }catch(e){
+
+
+
+            console.log(
+
+                "消息格式错误"
+
+            );
+
+
+            return;
+
+
+        }
+
+
+
+
+
+
+        console.log(
+
+            "收到:",
+
+            data.type,
+
+            data.room || ""
+
+        );
+
+
+
+
+
+
+
+
+
+        // ===============================
+        // 创建房间
+        // ===============================
+
+
+        if(data.type==="create"){
+
+
+
+            let roomId =
+
+
+
+            Math.floor(
+
+
+                100000+
+
+                Math.random()*900000
+
+
+            ).toString();
+
+
+
+
+
+
+
+            rooms[roomId]={
+
+
+
+                players:[player],
+
+
+
+                status:"waiting",
+
+
+
+                mode:data.mode || "special",
+
+
+
+                category:data.category || null,
+
+
+
+                count:getQuestionCount(data.mode),
+
+
+
+                questions:[]
+
+            };
+
+
+
+
+
+
+
+
+            player.room=roomId;
+
+
+            player.id=1;
+
+
+
+
+
+
+
+
+            console.log(
+
+
+                "创建房间:",
+
+
+                roomId
+
+
+            );
+
+
+
+
+
+
+
+
+            socket.send(JSON.stringify({
+
+
+
+                type:"room",
+
+
+
+                room:roomId,
+
+
+
+                player:1
+
+
+
+            }));
+
+
+
+
+
+
+            return;
+
+
+        }
+
+
+
+
+
+
+
+
+
+        // ===============================
+        // 加入房间
+        // ===============================
+
+
+        if(data.type==="join"){
+
+
+
+
+
+            let room=
+
+            rooms[data.room];
+
+
+
+
+
+
+
+            if(!room){
+
+
+
+                socket.send(JSON.stringify({
+
+
+                    type:"error",
+
+
+                    msg:"房间不存在"
+
+
+                }));
+
+
+
+                return;
+
+
+            }
+
+
+
+
+
+
+
+            if(room.players.length>=2){
+
+
+
+                socket.send(JSON.stringify({
+
+
+                    type:"error",
+
+
+                    msg:"房间已满"
+
+
+                }));
+
+
+
+                return;
+
+
+            }
+
+
+
+
+
+
+
+
+            player.room=data.room;
+
+
+            player.id=2;
+
+
+
+
+
+            room.players.push(player);
+
+
+
+            room.status="playing";
+
+
+
+
+
+
+
+
+
+            // 生成题目
+
+
+            room.questions=
+
+            createQuestions(
+
+
+                room.count,
+
+
+                room.category
+
+
+            );
+
+
+
+
+
+
+
+            console.log(
+
+
+                "生成题目:",
+
+
+                room.questions.length
+
+
+            );
+
+
+
+
+
+
+
+
+
+            // 通知双方开始
+
+
+            room.players.forEach(p=>{
+
+
+
+                if(p.socket.readyState===1){
+
+
+
+                    p.socket.send(JSON.stringify({
+
+
+
+                        type:"start",
+
+
+
+                        player:p.id,
+
+
+
+                        count:room.count
+
+
+
+                    }));
+
+
+                }
+
+
+            });
+
+
+
+
+
+
+
+
+            // 第一题
+
+
+            setTimeout(()=>{
+
+
+
+                room.players.forEach(p=>{
+
+
+                    sendQuestion(p);
+
+
+                });
+
+
+
+            },500);
+
+
+
+
+
+
+            return;
+
+
+        }
+
+// ===============================
+// 根据模式决定题量
+// ===============================
+
+
+function getQuestionCount(mode){
+
+
+
+    if(mode==="quarter"){
+
+
+        return 30;
+
+
+    }
+
+
+
+    if(mode==="half"){
+
+
+        return 60;
+
+
+    }
+
+
+
+    if(mode==="full"){
+
+
+        return 120;
+
+
+    }
+
+
+
+
+    // 默认专项模式
+
+    return 20;
+
+
+
+}
+
+
+
 
 
 
@@ -200,24 +738,47 @@ function sendQuestion(player){
 
 
 
+
+
+
+    // 全部答完
+
+
     if(player.index>=room.questions.length){
+
+
+
+        player.finished=true;
+
+
 
 
 
         player.socket.send(JSON.stringify({
 
 
+
             type:"finishQuestion"
+
 
 
         }));
 
 
 
+
+
+        checkGameFinish(room);
+
+
+
         return;
 
 
+
     }
+
+
 
 
 
@@ -232,33 +793,44 @@ function sendQuestion(player){
 
 
 
+
+
     player.socket.send(JSON.stringify({
+
 
 
         type:"question",
 
 
+
         index:player.index,
+
 
 
         total:room.questions.length,
 
 
+
         question:{
+
 
 
             id:q.id,
 
 
+
             category:q.category,
+
 
 
             q:q.q,
 
 
+
             options:q.options
 
 
+
         }
 
 
@@ -267,95 +839,6 @@ function sendQuestion(player){
 
 
 
-}
-
-// ===============================
-// 玩家连接
-// ===============================
-
-
-wss.on("connection",socket=>{
-
-
-
-console.log("玩家连接");
-
-
-
-
-
-let player={
-
-
-    socket:socket,
-
-
-    room:null,
-
-
-    id:null,
-
-
-    score:0,
-
-
-    index:0,
-
-
-    answers:[],
-
-
-    finished:false
-
-
-
-};
-
-
-
-
-
-
-socket.send(JSON.stringify({
-
-
-    type:"connected",
-
-
-    msg:"连接服务器成功"
-
-
-}));
-
-
-
-
-
-
-
-
-socket.on("message",msg=>{
-
-
-
-let data;
-
-
-
-try{
-
-
-    data=JSON.parse(msg);
-
-
-
-}catch(e){
-
-
-    console.log("错误消息");
-
-
-    return;
 
 
 }
@@ -365,410 +848,17 @@ try{
 
 
 
-console.log(
-
-"收到:",
-
-data.type,
-
-data.room || ""
-
-);
-
-
 
 
 
 
 
 // ===============================
-// 创建房间
+// 玩家答题
 // ===============================
 
 
-if(data.type==="create"){
-
-
-
-    let roomId=
-
-
-    Math.floor(
-
-
-        100000+
-
-        Math.random()*900000
-
-
-    ).toString();
-
-
-
-
-
-
-
-    rooms[roomId]={
-
-
-        players:[player],
-
-
-        status:"waiting",
-
-
-        mode:data.mode || "special",
-
-
-        category:data.category || null,
-
-
-        count:data.count || 20,
-
-
-        questions:[]
-
-
-
-    };
-
-
-
-
-
-
-
-    player.room=roomId;
-
-
-    player.id=1;
-
-
-
-
-
-
-
-    console.log(
-
-        "创建房间:",
-
-        roomId
-
-    );
-
-
-
-
-
-
-
-
-    socket.send(JSON.stringify({
-
-
-
-        type:"room",
-
-
-
-        room:roomId,
-
-
-
-        player:1,
-
-
-
-        mode:rooms[roomId].mode,
-
-
-
-        category:rooms[roomId].category,
-
-
-
-        count:rooms[roomId].count
-
-
-
-    }));
-
-
-
-
-
-
-    return;
-
-
-}
-
-
-
-
-
-
-
-
-
-// ===============================
-// 加入房间
-// ===============================
-
-
-if(data.type==="join"){
-
-
-
-    console.log(
-
-        "尝试加入:",
-
-        data.room
-
-    );
-
-
-
-
-
-
-    let room=
-
-    rooms[data.room];
-
-
-
-
-
-
-
-    if(!room){
-
-
-
-        socket.send(JSON.stringify({
-
-
-
-            type:"error",
-
-
-
-            msg:"房间不存在"
-
-
-
-        }));
-
-
-        return;
-
-
-    }
-
-
-
-
-
-
-
-
-    if(room.players.length>=2){
-
-
-
-        socket.send(JSON.stringify({
-
-
-
-            type:"error",
-
-
-
-            msg:"房间已满"
-
-
-
-        }));
-
-
-        return;
-
-
-    }
-
-
-
-
-
-
-
-
-
-    player.room=data.room;
-
-
-    player.id=2;
-
-
-
-    room.players.push(player);
-
-
-
-    room.status="playing";
-
-
-
-
-
-
-
-
-    // ===============================
-    // 生成比赛题目
-    // ===============================
-
-
-
-    room.questions=
-
-    createQuestions(
-
-
-        room.count,
-
-
-        room.category
-
-
-    );
-
-
-
-
-
-
-
-    console.log(
-
-        "生成题目:",
-
-        room.questions.length
-
-    );
-
-
-
-
-
-
-
-    console.log(
-
-        "比赛开始:",
-
-        data.room
-
-    );
-
-
-
-
-
-
-
-
-
-    // 通知双方开始
-
-
-    room.players.forEach(p=>{
-
-
-
-        if(p.socket.readyState===1){
-
-
-
-            p.socket.send(JSON.stringify({
-
-
-
-                type:"start",
-
-
-
-                player:p.id,
-
-
-
-                mode:room.mode,
-
-
-
-                category:room.category,
-
-
-
-                count:room.count
-
-
-
-            }));
-
-
-        }
-
-
-    });
-
-
-
-
-
-
-
-
-
-    // 发第一题
-
-
-    setTimeout(()=>{
-
-
-        room.players.forEach(p=>{
-
-
-            sendQuestion(p);
-
-
-        });
-
-
-
-    },500);
-
-
-
-
-
-
-
-    return;
-
-
-}
-
-// ===============================
-// 答题
-// ===============================
-
-
-if(data.type==="answer"){
+function playerAnswer(player,data){
 
 
 
@@ -784,18 +874,17 @@ if(data.type==="answer"){
 
 
 
+
     let q=
 
     room.questions[player.index];
 
 
 
+    if(!q)return;
 
-    if(!q){
 
-        return;
 
-    }
 
 
 
@@ -812,10 +901,14 @@ if(data.type==="answer"){
 
 
 
+
+
     if(correct){
 
 
+
         player.score+=100;
+
 
 
     }
@@ -827,14 +920,16 @@ if(data.type==="answer"){
 
 
 
-
     player.answers.push({
 
 
-        question:q.id,
+
+        id:q.id,
+
 
 
         choice:data.choice,
+
 
 
         correct:correct
@@ -842,6 +937,7 @@ if(data.type==="answer"){
 
 
     });
+
 
 
 
@@ -859,11 +955,10 @@ if(data.type==="answer"){
 
 
 
-
     // 返回自己结果
 
 
-    socket.send(JSON.stringify({
+    player.socket.send(JSON.stringify({
 
 
 
@@ -875,11 +970,7 @@ if(data.type==="answer"){
 
 
 
-        correct:correct,
-
-
-
-        index:player.index
+        correct:correct
 
 
 
@@ -902,12 +993,9 @@ if(data.type==="answer"){
 
         if(
 
-
             p!==player &&
 
-
             p.socket.readyState===1
-
 
         ){
 
@@ -932,6 +1020,7 @@ if(data.type==="answer"){
             }));
 
 
+
         }
 
 
@@ -945,27 +1034,14 @@ if(data.type==="answer"){
 
 
 
-    // 下一题
-
-
     setTimeout(()=>{
-
 
 
         sendQuestion(player);
 
 
 
-    },500);
-
-
-
-
-
-
-
-
-    return;
+    },300);
 
 
 
@@ -978,46 +1054,20 @@ if(data.type==="answer"){
 
 
 
-
-
-
 // ===============================
-// 提交比赛
+// 检查比赛结束
 // ===============================
 
 
-if(data.type==="submit"){
+function checkGameFinish(room){
 
 
 
-    let room=
+    let finished=
 
-    rooms[player.room];
+    room.players.every(p=>
 
-
-
-    if(!room)return;
-
-
-
-
-
-
-    player.finished=true;
-
-
-
-
-
-
-
-    console.log(
-
-        "玩家完成:",
-
-        player.id,
-
-        player.score
+        p.finished
 
     );
 
@@ -1026,161 +1076,55 @@ if(data.type==="submit"){
 
 
 
-    // 检查双方是否都完成
 
+    if(!finished){
 
-    let allFinish =
 
-    room.players.every(p=>p.finished);
+        return;
 
 
+    }
 
 
 
 
 
 
-    if(allFinish){
 
+    let p1=
 
+    room.players[0];
 
-        let p1=room.players[0];
 
-        let p2=room.players[1];
 
+    let p2=
 
+    room.players[1];
 
 
 
 
 
-        let result="";
 
 
+    let result;
 
-        if(p1.score>p2.score){
 
 
-            result="player1";
+    if(p1.score>p2.score){
 
 
-        }
 
-        else if(p2.score>p1.score){
+        result="player1";
 
 
-            result="player2";
+    }
 
+    else if(p2.score>p1.score){
 
-        }
 
-        else{
 
-
-            result="draw";
-
-
-        }
-
-
-
-
-
-
-
-        console.log(
-
-            "比赛结果:",
-
-            result
-
-        );
-
-
-
-
-
-
-
-
-
-        room.players.forEach(p=>{
-
-
-
-            let win=false;
-
-
-            if(
-
-                result==="draw"
-
-            ){
-
-
-                win=false;
-
-
-            }
-
-            else if(
-
-                result==="player"+p.id
-
-            ){
-
-
-                win=true;
-
-
-            }
-
-
-
-
-
-
-
-
-            p.socket.send(JSON.stringify({
-
-
-
-                type:"gameResult",
-
-
-
-                result:result,
-
-
-
-                myScore:p.score,
-
-
-
-                enemyScore:
-
-
-                room.players.find(
-
-                    x=>x!==p
-
-                ).score,
-
-
-
-                win:win
-
-
-
-            }));
-
-
-
-        });
-
-
-
+        result="player2";
 
 
     }
@@ -1189,18 +1133,7 @@ if(data.type==="submit"){
 
 
 
-        socket.send(JSON.stringify({
-
-
-            type:"finish",
-
-
-            player:player.id
-
-
-
-        }));
-
+        result="draw";
 
 
     }
@@ -1209,32 +1142,14 @@ if(data.type==="submit"){
 
 
 
-    return;
-
-
-
-}
-
-// ===============================
-// 玩家离开
-// ===============================
-
-
-socket.on("close",()=>{
 
 
 
     console.log(
 
+        "比赛结束:",
 
-        "玩家离开",
-
-
-        player.id,
-
-
-        player.room
-
+        result
 
     );
 
@@ -1245,32 +1160,182 @@ socket.on("close",()=>{
 
 
 
-    if(
-
-
-        player.room &&
-
-
-        rooms[player.room]
-
-
-    ){
+    room.players.forEach(p=>{
 
 
 
-        rooms[player.room].players=
+        let win=false;
 
 
 
-        rooms[player.room].players.filter(
+        if(
+
+            result==="player"+p.id
+
+        ){
 
 
-            p=>p!==player
+
+            win=true;
+
+
+        }
+
+
+
+
+
+
+
+        p.socket.send(JSON.stringify({
+
+
+
+            type:"gameResult",
+
+
+
+            result:result,
+
+
+
+            myScore:p.score,
+
+
+
+            enemyScore:
+
+            room.players.find(
+
+                x=>x!==p
+
+            ).score,
+
+
+
+            win:win
+
+
+
+        }));
+
+
+
+    });
+
+
+
+}
+// ===============================
+// 消息处理
+// ===============================
+
+
+        if(data.type==="answer"){
+
+
+
+            playerAnswer(
+
+                player,
+
+                data
+
+            );
+
+
+
+            return;
+
+
+
+        }
+
+
+
+
+
+
+
+
+
+        // ===============================
+        // 手动提交
+        // ===============================
+
+
+        if(data.type==="submit"){
+
+
+
+            player.finished=true;
+
+
+
+            let room=
+
+            rooms[player.room];
+
+
+
+            if(room){
+
+
+
+                checkGameFinish(room);
+
+
+
+            }
+
+
+
+            return;
+
+
+        }
+
+
+
+
+
+
+    });
+
+
+
+
+
+
+
+
+
+    // ===============================
+    // 玩家离开
+    // ===============================
+
+
+    socket.on("close",()=>{
+
+
+
+        console.log(
+
+
+
+            "玩家离开",
+
+
+
+            player.id,
+
+
+
+            player.room
+
 
 
         );
-
-
 
 
 
@@ -1280,29 +1345,62 @@ socket.on("close",()=>{
 
         if(
 
+            player.room &&
 
-            rooms[player.room].players.length===0
-
+            rooms[player.room]
 
         ){
 
 
 
-            delete rooms[player.room];
+            let room=
+
+            rooms[player.room];
+
+
+
+
+
+
+
+            room.players=
+
+            room.players.filter(
+
+                p=>p!==player
+
+            );
+
+
+
+
+
+
+
+            // 房间没人了删除
+
+
+            if(
+
+                room.players.length===0
+
+            ){
+
+
+
+                delete rooms[player.room];
+
+
+
+            }
+
 
 
         }
 
 
 
-    }
-
-
-
-
-});
-
-
+    });
 
 
 
