@@ -1,31 +1,45 @@
 // ===============================
-// 公务员行测竞技擂台 联机服务器
+// 公务员行测竞技擂台 联机服务器 V2
 // ===============================
 
+
 const WebSocket = require("ws");
+
 
 
 // ===============================
 // 创建服务器
 // ===============================
 
+
 const PORT = process.env.PORT || 3000;
 
+
 const wss = new WebSocket.Server({
-    port: PORT
+
+    port:PORT
+
 });
 
 
+
 console.log("服务器启动成功");
-console.log("监听端口:" + PORT);
+
+console.log("监听端口:"+PORT);
+
+
 
 
 
 // ===============================
-// 房间数据
+// 房间
 // ===============================
 
-let rooms = {};
+
+let rooms={};
+
+
+
 
 
 
@@ -34,462 +48,756 @@ let rooms = {};
 // 玩家连接
 // ===============================
 
-wss.on("connection", socket => {
 
+wss.on("connection",socket=>{
 
-    console.log("玩家连接");
 
 
-    let player = {
+console.log("玩家连接");
 
-        socket: socket,
 
-        room: null,
 
-        id: null,
 
-        score: 0,
 
-        index: 0,
+let player={
 
-        answers: [],
 
-        finished:false
+    socket:socket,
 
-    };
 
+    room:null,
 
 
-    socket.send(JSON.stringify({
+    id:null,
 
-        type:"connected",
 
-        msg:"连接服务器成功"
+    score:0,
 
-    }));
 
+    index:0,
 
 
+    answers:[],
 
-    // ===============================
-    // 收消息
-    // ===============================
 
-    socket.on("message", msg => {
+    finished:false
 
 
-        let data;
 
+};
 
-        try{
 
-            data = JSON.parse(msg);
 
 
-        }catch(e){
 
-            console.log("错误消息:",msg.toString());
 
-            return;
+socket.send(JSON.stringify({
 
-        }
 
+    type:"connected",
 
+    msg:"连接服务器成功"
 
-        console.log(
-            "收到:",
-            data.type,
-            data.room || ""
-        );
 
+}));
 
 
 
 
-        // ===============================
-        // 创建房间
-        // ===============================
 
 
-        if(data.type==="create"){
 
 
-            let roomId =
 
-            Math.floor(
+socket.on("message",msg=>{
 
-                100000 +
 
-                Math.random()*900000
 
-            ).toString();
+let data;
 
 
 
+try{
 
-            rooms[roomId]={
 
-                players:[player],
+data=JSON.parse(msg);
 
-                status:"waiting"
 
-            };
 
+}catch(e){
 
 
-            player.room=roomId;
+console.log("错误消息");
 
-            player.id=1;
 
+return;
 
 
-            console.log(
-                "创建房间:",
-                roomId
-            );
+}
 
 
 
-            socket.send(JSON.stringify({
 
-                type:"room",
 
-                room:roomId,
 
-                player:1
+console.log(
 
-            }));
+"收到:",
 
+data.type,
 
+data.room||""
 
-            return;
+);
 
-        }
 
 
 
 
 
-        // ===============================
-        // 加入房间
-        // ===============================
 
 
-        if(data.type==="join"){
+// ===============================
+// 创建房间
+// ===============================
 
 
+if(data.type==="create"){
 
-            console.log(
-                "尝试加入房间:",
-                data.room
-            );
 
 
+let roomId =
 
-            let room = rooms[data.room];
 
+Math.floor(
 
+100000+
 
-            if(!room){
+Math.random()*900000
 
+).toString();
 
-                socket.send(JSON.stringify({
 
-                    type:"error",
 
-                    msg:"房间不存在"
 
-                }));
 
 
-                return;
+rooms[roomId]={
 
-            }
 
 
+    players:[player],
 
 
-            if(room.players.length>=2){
 
+    status:"waiting",
 
-                socket.send(JSON.stringify({
 
-                    type:"error",
 
-                    msg:"房间已满"
+    mode:data.mode || "special",
 
-                }));
 
 
-                return;
+    category:data.category || null,
 
 
-            }
 
+    count:data.count || 20
 
 
 
+};
 
-            player.room=data.room;
 
-            player.id=2;
 
 
 
-            room.players.push(player);
+player.room=roomId;
 
 
+player.id=1;
 
-            room.status="playing";
 
 
 
 
-            console.log(
 
-                "房间开始:",
-                data.room
 
-            );
+console.log(
 
+"创建房间:",
 
+roomId,
 
+rooms[roomId]
 
-            room.players.forEach(p=>{
+);
 
 
-                if(p.socket.readyState===1){
 
 
-                    p.socket.send(JSON.stringify({
 
-                        type:"start",
 
-                        player:p.id
 
 
-                    }));
+socket.send(JSON.stringify({
 
-                }
 
 
-            });
+type:"room",
 
 
 
-            return;
+room:roomId,
 
-        }
 
 
+player:1,
 
 
 
+mode:rooms[roomId].mode,
 
-        // ===============================
-        // 答题
-        // ===============================
 
 
-        if(data.type==="answer"){
+category:rooms[roomId].category,
 
 
 
-            let room = rooms[player.room];
+count:rooms[roomId].count
 
 
 
-            if(!room){
+}));
 
-                return;
 
-            }
 
 
 
-            player.index++;
+return;
 
 
 
-            if(data.correct){
+}
 
-                player.score +=100;
 
-            }
 
 
 
 
-            player.answers.push({
 
-                choice:data.choice,
 
-                correct:data.correct
 
-            });
 
+// ===============================
+// 加入房间
+// ===============================
 
 
+if(data.type==="join"){
 
 
 
-            room.players.forEach(p=>{
 
 
-                if(
+console.log(
 
-                    p!==player &&
+"尝试加入:",
 
-                    p.socket.readyState===1
+data.room
 
-                ){
+);
 
 
-                    p.socket.send(JSON.stringify({
 
-                        type:"enemy",
 
-                        index:player.index,
 
-                        score:player.score
 
+let room=
 
-                    }));
+rooms[data.room];
 
 
-                }
 
 
-            });
 
 
 
+if(!room){
 
 
 
-            socket.send(JSON.stringify({
+socket.send(JSON.stringify({
 
-                type:"result",
 
-                score:player.score,
+type:"error",
 
-                index:player.index
 
+msg:"房间不存在"
 
-            }));
 
+}));
 
 
-            return;
+return;
 
 
-        }
+}
 
 
 
 
 
 
-        // ===============================
-        // 提交
-        // ===============================
 
 
-        if(data.type==="submit"){
+if(room.players.length>=2){
 
 
 
-            let room=rooms[player.room];
+socket.send(JSON.stringify({
 
 
-            if(!room)return;
+type:"error",
 
 
+msg:"房间已满"
 
-            player.finished=true;
 
+}));
 
 
-            room.players.forEach(p=>{
+return;
 
 
-                if(p.socket.readyState===1){
 
+}
 
-                    p.socket.send(JSON.stringify({
 
-                        type:"finish",
 
-                        player:player.id
 
 
-                    }));
 
-                }
 
+player.room=data.room;
 
-            });
 
+player.id=2;
 
 
-            return;
 
-        }
+room.players.push(player);
 
 
 
+room.status="playing";
 
-    });
 
 
 
 
 
 
-    // ===============================
-    // 断开
-    // ===============================
+console.log(
 
+"开始比赛:",
 
-    socket.on("close",()=>{
+data.room
 
+);
 
-        console.log(
-            "玩家离开",
-            player.id,
-            player.room
-        );
 
 
 
-        if(player.room && rooms[player.room]){
 
 
-            rooms[player.room].players =
 
-            rooms[player.room].players.filter(
 
-                p=>p!==player
+// 告诉双方比赛信息
 
-            );
 
+room.players.forEach(p=>{
 
 
-            if(
 
-                rooms[player.room].players.length===0
+if(p.socket.readyState===1){
 
-            ){
 
-                delete rooms[player.room];
 
-            }
+p.socket.send(JSON.stringify({
 
 
-        }
 
+type:"start",
 
-    });
+
+
+player:p.id,
+
+
+
+mode:room.mode,
+
+
+
+category:room.category,
+
+
+
+count:room.count
+
+
+
+}));
+
+
+}
+
+
+
+});
+
+
+
+
+
+
+
+return;
+
+
+
+}
+
+
+
+
+
+
+
+
+
+
+
+// ===============================
+// 答题
+// ===============================
+
+
+if(data.type==="answer"){
+
+
+
+let room=
+
+rooms[player.room];
+
+
+
+
+if(!room)return;
+
+
+
+
+
+
+player.index++;
+
+
+
+
+
+
+if(data.correct){
+
+
+
+player.score+=100;
+
+
+
+}
+
+
+
+
+
+
+
+
+player.answers.push({
+
+
+
+choice:data.choice,
+
+
+
+correct:data.correct
+
+
+
+});
+
+
+
+
+
+
+
+
+// 通知对手
+
+
+room.players.forEach(p=>{
+
+
+
+if(
+
+p!==player &&
+
+p.socket.readyState===1
+
+){
+
+
+
+p.socket.send(JSON.stringify({
+
+
+
+type:"enemy",
+
+
+
+index:player.index,
+
+
+
+score:player.score
+
+
+
+}));
+
+
+
+}
+
+
+
+});
+
+
+
+
+
+
+
+
+// 返回自己分数
+
+
+socket.send(JSON.stringify({
+
+
+
+type:"result",
+
+
+
+score:player.score,
+
+
+
+index:player.index
+
+
+
+}));
+
+
+
+
+
+
+return;
+
+
+}
+
+
+
+
+
+
+
+
+
+// ===============================
+// 提交
+// ===============================
+
+
+if(data.type==="submit"){
+
+
+
+let room=
+
+rooms[player.room];
+
+
+
+if(!room)return;
+
+
+
+
+
+
+player.finished=true;
+
+
+
+
+
+
+
+room.players.forEach(p=>{
+
+
+
+if(p.socket.readyState===1){
+
+
+
+p.socket.send(JSON.stringify({
+
+
+
+type:"finish",
+
+
+
+player:player.id
+
+
+
+}));
+
+
+
+}
+
+
+
+});
+
+
+
+
+
+return;
+
+
+
+}
+
+
+
+
+
+
+});
+
+
+
+
+
+
+
+
+
+
+
+// ===============================
+// 玩家离开
+// ===============================
+
+
+socket.on("close",()=>{
+
+
+
+console.log(
+
+"玩家离开",
+
+player.id,
+
+player.room
+
+);
+
+
+
+
+
+
+
+if(
+
+player.room &&
+
+rooms[player.room]
+
+){
+
+
+
+rooms[player.room].players=
+
+
+rooms[player.room].players.filter(
+
+
+p=>p!==player
+
+
+);
+
+
+
+
+
+
+
+if(
+
+rooms[player.room].players.length===0
+
+){
+
+
+
+delete rooms[player.room];
+
+
+}
+
+
+
+}
+
+
+
+});
+
+
+
 
 
 
